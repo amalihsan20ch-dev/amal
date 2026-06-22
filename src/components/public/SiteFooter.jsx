@@ -22,6 +22,7 @@ export default function SiteFooter() {
             <li><a href="#programs" className="hover:text-white">برامجنا</a></li>
             <li><a href="#impact" className="hover:text-white">أثرنا</a></li>
             <li><a href="/volunteer/register" className="hover:text-white">التطوّع</a></li>
+            <li><a href="/contact" className="hover:text-white">تواصل معنا</a></li>
           </ul>
         </div>
 

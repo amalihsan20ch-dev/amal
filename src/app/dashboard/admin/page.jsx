@@ -1,93 +1,67 @@
-import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import Icon from "@/components/ui/Icon";
 
-// Server Action: approve/reject a volunteer (staff only — RLS enforces it).
-async function setStatus(formData) {
-  "use server";
-  const id = formData.get("id");
-  const status = formData.get("status");
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  await supabase.from("volunteers")
-    .update({ status, reviewed_by: user.id })
-    .eq("id", id);
-  revalidatePath("/dashboard/admin");
-}
+export const dynamic = "force-dynamic";
+
+const CARDS = [
+  { href: "/crm/beneficiaries", icon: "hand-heart", title: "المستفيدون", desc: "سجلّ الحالات (خاص)" },
+  { href: "/crm/donors", icon: "gift", title: "المتبرعون", desc: "تبرّعات وإجماليات (خاص)" },
+  { href: "/crm/volunteers", icon: "users", title: "طلبات التطوّع", desc: "قبول/رفض + السير الذاتية" },
+  { href: "/crm/achievements", icon: "sparkles", title: "الأعمال", desc: "معرض الموقع العام" },
+  { href: "/crm/tasks", icon: "calendar", title: "المهام", desc: "إسناد المهام للمتطوّعين" },
+  { href: "/crm/library", icon: "shield", title: "المكتبة", desc: "مواد تدريبية" },
+];
+const ADMIN_CARDS = [
+  { href: "/crm/metrics", icon: "trending-up", title: "مؤشرات الأثر", desc: "أرقام الصفحة العامة" },
+  { href: "/crm/settings", icon: "phone", title: "الإعدادات", desc: "ربط بوت تيليجرام" },
+  { href: "/crm/activity", icon: "map", title: "سجلّ النشاط", desc: "تتبّع الإجراءات" },
+];
 
 export default async function AdminDashboard() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/admin");
+  const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).single();
+  const superAdmin = profile?.role === "super_admin";
 
-  // Volunteer applications joined to profile names.
-  const { data: apps } = await supabase
-    .from("volunteers")
-    .select("id, status, skills, city, cv_url, profiles(full_name, phone)")
-    .order("created_at", { ascending: false });
+  const [{ count: pending }, { count: beneficiaries }, { count: donorsCount }] = await Promise.all([
+    supabase.from("volunteers").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("beneficiaries").select("id", { count: "exact", head: true }),
+    supabase.from("donors").select("id", { count: "exact", head: true }),
+  ]);
 
-  const pending = (apps ?? []).filter((a) => a.status === "pending");
+  const cards = [...CARDS, ...(superAdmin ? ADMIN_CARDS : [])];
 
   return (
-    <main className="container-x py-10">
-      <h1 className="text-2xl font-extrabold text-brand-700">لوحة الإدارة</h1>
+    <main className="container-x py-8">
+      <h1 className="text-2xl font-extrabold text-brand-700">أهلاً، {profile?.full_name || "مدير"}</h1>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <a href="/dashboard/admin/metrics" className="rounded-2xl border border-brand-100 bg-white p-5 shadow-card">
-          <p className="font-bold text-brand-700">مؤشرات الأثر</p>
-          <p className="text-sm text-ink-soft">تحديث الأرقام المعروضة للعامة</p>
-        </a>
-        <a href="/dashboard/admin/beneficiaries" className="rounded-2xl border border-brand-100 bg-white p-5 shadow-card">
-          <p className="font-bold text-brand-700">المستفيدون (خاص)</p>
-          <p className="text-sm text-ink-soft">سجلّ داخلي — لا يُعرض للعامة</p>
-        </a>
-        <a href="/dashboard/admin/donors" className="rounded-2xl border border-brand-100 bg-white p-5 shadow-card">
-          <p className="font-bold text-brand-700">المتبرعون (خاص)</p>
-          <p className="text-sm text-ink-soft">توثيق التفاعلات داخليًا</p>
-        </a>
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        {[
+          { l: "طلبات قيد المراجعة", v: pending ?? 0, href: "/crm/volunteers?status=pending" },
+          { l: "مستفيدون", v: beneficiaries ?? 0, href: "/crm/beneficiaries" },
+          { l: "متبرعون", v: donorsCount ?? 0, href: "/crm/donors" },
+        ].map((s) => (
+          <Link key={s.l} href={s.href} className="card p-4 text-center transition hover:shadow-soft">
+            <p className="text-3xl font-black text-brand-600">{Number(s.v).toLocaleString("ar-EG")}</p>
+            <p className="text-xs font-medium text-ink-soft">{s.l}</p>
+          </Link>
+        ))}
       </div>
 
-      <section className="mt-10">
-        <h2 className="mb-3 font-extrabold text-brand-700">
-          طلبات التطوّع — قيد المراجعة ({pending.length})
-        </h2>
-        <div className="overflow-hidden rounded-2xl border border-ink-line bg-white shadow-card">
-          {(apps ?? []).map((a) => (
-            <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-line p-4 last:border-0">
-              <div>
-                <p className="font-bold">{a.profiles?.full_name || "—"}</p>
-                <p className="text-sm text-ink-soft">
-                  {a.city || "—"} · {(a.skills || []).join("، ") || "بلا مهارات مُدخلة"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {a.cv_url ? (
-                  <span className="text-sm text-brand-600">سيرة مرفقة</span>
-                ) : null}
-                {a.status === "pending" ? (
-                  <>
-                    <form action={setStatus}>
-                      <input type="hidden" name="id" value={a.id} />
-                      <input type="hidden" name="status" value="approved" />
-                      <button className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-bold text-white">قبول</button>
-                    </form>
-                    <form action={setStatus}>
-                      <input type="hidden" name="id" value={a.id} />
-                      <input type="hidden" name="status" value="rejected" />
-                      <button className="rounded-lg border border-ink-line px-3 py-1.5 text-sm font-bold text-ink-soft">رفض</button>
-                    </form>
-                  </>
-                ) : (
-                  <span className="text-sm font-bold text-ink-soft">
-                    {a.status === "approved" ? "مقبول" : "مرفوض"}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-          {!apps?.length ? <p className="p-5 text-ink-soft">لا طلبات بعد.</p> : null}
-        </div>
-      </section>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((c) => (
+          <Link key={c.href} href={c.href} className="card group p-5 transition hover:-translate-y-1 hover:shadow-soft">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-600 transition group-hover:bg-brand-600 group-hover:text-white">
+              <Icon name={c.icon} />
+            </span>
+            <p className="mt-3 font-extrabold text-brand-700">{c.title}</p>
+            <p className="text-sm text-ink-soft">{c.desc}</p>
+          </Link>
+        ))}
+      </div>
     </main>
   );
 }

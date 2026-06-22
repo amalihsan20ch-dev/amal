@@ -308,3 +308,39 @@ on conflict do nothing;
 --    update profiles set role = 'super_admin'
 --    where id = (select id from auth.users where email = 'YOUR_EMAIL');
 -- =====================================================================
+
+-- =====================================================================
+--  9) Settings + Activity log (added for admin tooling)
+-- =====================================================================
+create table if not exists settings (
+  key        text primary key,
+  value      text,
+  updated_by uuid references profiles(id),
+  updated_at timestamptz not null default now()
+);
+alter table settings enable row level security;
+drop policy if exists settings_staff_read  on settings;
+drop policy if exists settings_admin_write  on settings;
+create policy settings_staff_read on settings for select using (is_staff());
+create policy settings_admin_write on settings for all
+  using (auth_role() = 'super_admin') with check (auth_role() = 'super_admin');
+
+create table if not exists activity_log (
+  id         bigint generated always as identity primary key,
+  actor_id   uuid references profiles(id),
+  action     text not null,
+  entity     text,
+  entity_id  text,
+  detail     text,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_activity_created on activity_log (created_at desc);
+alter table activity_log enable row level security;
+drop policy if exists activity_staff_read   on activity_log;
+drop policy if exists activity_staff_insert on activity_log;
+create policy activity_staff_read   on activity_log for select using (is_staff());
+create policy activity_staff_insert on activity_log for insert with check (is_staff());
+
+-- default notify toggle
+insert into settings (key, value) values ('notify_new_volunteer','true')
+on conflict (key) do nothing;

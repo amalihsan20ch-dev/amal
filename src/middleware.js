@@ -46,7 +46,7 @@ export async function middleware(request) {
       return NextResponse.redirect(url);
     }
     // Metrics manager is super_admin only
-    if (path.startsWith("/crm/metrics") && profile?.role !== "super_admin") {
+    if ((path.startsWith("/crm/metrics") || path.startsWith("/crm/settings")) && profile?.role !== "super_admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/crm/beneficiaries";
       return NextResponse.redirect(url);

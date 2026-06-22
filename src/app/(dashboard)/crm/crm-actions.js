@@ -16,6 +16,10 @@ async function requireStaff() {
 
 const txt = (fd, k) => fd.get(k)?.toString().trim() || null;
 
+async function log(supabase, actor, action, entity, entity_id, detail) {
+  await supabase.from("activity_log").insert({ actor_id: actor, action, entity, entity_id, detail });
+}
+
 // ---- Beneficiaries --------------------------------------------------
 export async function addBeneficiary(_prev, formData) {
   const { supabase, user, staff } = await requireStaff();
@@ -35,17 +39,19 @@ export async function addBeneficiary(_prev, formData) {
     created_by: user.id,
   });
   if (error) return { ok: false, error: "تعذّر حفظ الحالة." };
+  await log(supabase, user.id, "beneficiary:add", "beneficiary", null, full_name);
   revalidatePath("/crm/beneficiaries");
   return { ok: true };
 }
 
 export async function updateBeneficiaryStatus(formData) {
-  const { supabase, staff } = await requireStaff();
+  const { supabase, user, staff } = await requireStaff();
   if (!staff) return;
   const id = formData.get("id");
   const status = formData.get("status")?.toString();
   if (!id || !["pending", "assessed", "aided"].includes(status)) return;
   await supabase.from("beneficiaries").update({ status }).eq("id", id);
+  await log(supabase, user.id, `beneficiary:${status}`, "beneficiary", id, null);
   revalidatePath("/crm/beneficiaries");
 }
 
@@ -65,6 +71,7 @@ export async function addDonor(_prev, formData) {
     created_by: user.id,
   });
   if (error) return { ok: false, error: "تعذّر حفظ المتبرّع." };
+  await log(supabase, user.id, "donor:add", "donor", null, donor_name);
   revalidatePath("/crm/donors");
   return { ok: true };
 }
@@ -88,6 +95,8 @@ export async function logDonation(_prev, formData) {
     logged_by: user.id,
   });
   if (error) return { ok: false, error: "تعذّر تسجيل التبرّع." };
+  await log(supabase, user.id, "donation:add", "donor", donor_id, String(amount));
   revalidatePath("/crm/donors");
+  revalidatePath(`/crm/donors/${donor_id}`);
   return { ok: true };
 }

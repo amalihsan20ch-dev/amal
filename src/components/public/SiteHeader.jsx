@@ -9,6 +9,7 @@ const LINKS = [
   { href: "#programs", label: "برامجنا" },
   { href: "#impact", label: "أثرنا" },
   { href: "#work", label: "أعمالنا" },
+  { href: "/contact", label: "تواصل" },
 ];
 
 export default function SiteHeader() {

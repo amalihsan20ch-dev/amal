@@ -1,13 +1,8 @@
 // =====================================================================
-//  Telegram notifier for new volunteer registrations (Section 6).
-//  Supabase Database Webhook (INSERT on public.volunteers) → POST here.
-//  We verify a shared secret header, then push a message to the bot.
-//
-//  Configure in Supabase: Database → Webhooks → Create:
-//    Table: volunteers   Events: INSERT
-//    Type: HTTP Request   Method: POST
-//    URL: https://YOUR_APP.vercel.app/api/volunteer-webhook
-//    HTTP Headers: x-webhook-secret = <WEBHOOK_SECRET>
+//  Telegram notifier for new volunteer registrations.
+//  Supabase Database Webhook (INSERT on volunteers) → POST here.
+//  Now: reads chat_id + toggle from `settings`, and ATTACHES the CV file
+//  via a short-lived signed URL (sendDocument) instead of text-only.
 // =====================================================================
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -15,7 +10,6 @@ import { createClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  // 1) verify the call really came from our Supabase webhook
   if (request.headers.get("x-webhook-secret") !== process.env.WEBHOOK_SECRET) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -24,33 +18,56 @@ export async function POST(request) {
   const row = payload?.record;
   if (!row) return NextResponse.json({ error: "no record" }, { status: 400 });
 
-  // 2) enrich with the volunteer's name (service role bypasses RLS server-side)
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
+  // settings: allow disabling notifications + overriding chat id from the DB
+  let chatId = process.env.TELEGRAM_CHAT_ID;
+  try {
+    const { data: s } = await admin.from("settings").select("key,value")
+      .in("key", ["notify_new_volunteer", "telegram_chat_id"]);
+    const map = Object.fromEntries((s || []).map((r) => [r.key, r.value]));
+    if (map.notify_new_volunteer === "false") return NextResponse.json({ ok: true, skipped: true });
+    if (map.telegram_chat_id) chatId = map.telegram_chat_id;
+  } catch { /* fall back to env */ }
+
+  // enrich with the volunteer's name
   let name = "متطوّع جديد";
   try {
-    const admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-    const { data } = await admin
-      .from("profiles").select("full_name").eq("id", row.profile_id).single();
+    const { data } = await admin.from("profiles").select("full_name").eq("id", row.profile_id).single();
     if (data?.full_name) name = data.full_name;
-  } catch { /* non-fatal — still notify */ }
+  } catch {}
 
-  // 3) notify Telegram
-  const text =
+  const caption =
     `🤝 طلب تطوّع جديد\n` +
     `الاسم: ${name}\n` +
     `المدينة: ${row.city || "—"}\n` +
-    `المهارات: ${(row.skills || []).join("، ") || "—"}`;
+    `المهارات: ${(row.skills || []).join("، ") || "—"}` +
+    (row.cv_url ? "" : "\n(بدون سيرة ذاتية)");
 
-  const res = await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-    {
+  const base = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+  let res;
+
+  if (row.cv_url) {
+    // private bucket → signed URL Telegram can fetch for a short window
+    const { data: signed } = await admin.storage.from("cvs").createSignedUrl(row.cv_url, 600);
+    if (signed?.signedUrl) {
+      res = await fetch(`${base}/sendDocument`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, document: signed.signedUrl, caption }),
+      });
+    }
+  }
+  if (!res) {
+    res = await fetch(`${base}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text }),
-    }
-  );
+      body: JSON.stringify({ chat_id: chatId, text: caption }),
+    });
+  }
 
   if (!res.ok) return NextResponse.json({ error: "telegram failed" }, { status: 502 });
   return NextResponse.json({ ok: true });

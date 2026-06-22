@@ -7,10 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 async function requireSuperAdmin() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { supabase, ok: false };
+  if (!user) return { supabase, user: null, ok: false };
   const { data: profile } = await supabase
     .from("profiles").select("role").eq("id", user.id).single();
-  return { supabase, ok: profile?.role === "super_admin" };
+  return { supabase, user, ok: profile?.role === "super_admin" };
 }
 
 // Refresh BOTH the manager and the public homepage so new numbers show at once.
@@ -19,8 +19,12 @@ function refresh() {
   revalidatePath("/crm/metrics");
 }
 
+async function logMetric(supabase, actor, detail) {
+  await supabase.from("activity_log").insert({ actor_id: actor, action: "metric:update", entity: "metric", detail });
+}
+
 export async function updateMetric(_prev, formData) {
-  const { supabase, ok } = await requireSuperAdmin();
+  const { supabase, user, ok } = await requireSuperAdmin();
   if (!ok) return { ok: false, error: "هذه الصلاحية لمدير النظام فقط." };
 
   const id = formData.get("id");
@@ -37,6 +41,7 @@ export async function updateMetric(_prev, formData) {
 
   const { error } = await supabase.from("impact_metrics").update(patch).eq("id", id);
   if (error) return { ok: false, error: "تعذّر التحديث." };
+  await logMetric(supabase, user.id, `${patch.label_ar || ""} = ${value}`);
   refresh();
   return { ok: true };
 }

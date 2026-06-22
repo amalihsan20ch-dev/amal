@@ -49,6 +49,9 @@ function LoginForm() {
           <button onClick={signIn} disabled={busy} className="btn-primary w-full disabled:opacity-60">
             {busy ? "جارٍ الدخول…" : "دخول"}
           </button>
+          <p className="text-center text-sm">
+            <a href="/forgot-password" className="font-bold text-brand-600">نسيت كلمة المرور؟</a>
+          </p>
         </div>
         <p className="mt-5 text-center text-sm text-ink-soft">
           متطوّع جديد؟{" "}
