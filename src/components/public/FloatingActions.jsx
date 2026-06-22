@@ -1,7 +1,7 @@
 "use client";
 // Floating WhatsApp + social quick-access. Set the real numbers/links here.
-const WHATSAPP = "963999999999"; // ← ضع رقم الجمعية بصيغة دولية بلا +
-const FACEBOOK = "https://facebook.com/";
+const WHATSAPP = "963935214472"; // ← ضع رقم الجمعية بصيغة دولية بلا +
+const FACEBOOK = "https://www.facebook.com/share/1JiJbrC7s6/";
 
 export default function FloatingActions() {
   return (
