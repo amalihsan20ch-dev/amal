@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tajawal — modern, warm Arabic face; few weights to stay light on phones */
+@import url("https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap");
+
+:root { color-scheme: light; }
+html { scroll-behavior: smooth; }
+body {
+  background:
+    radial-gradient(1100px 500px at 100% -10%, #DBF0F340, transparent),
+    radial-gradient(900px 500px at -10% 10%, #EFF6FB, transparent),
+    #ffffff;
+  color: theme("colors.ink.DEFAULT");
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Respect reduced-motion + spare low-end GPUs */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-6xl px-5 sm:px-8; }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-600
+           px-5 py-3 font-bold text-white shadow-soft transition
+           hover:bg-brand-700 focus:outline-none focus-visible:ring-4
+           focus-visible:ring-brand-200 active:scale-[.98];
+  }
+  .btn-warm {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl bg-warm-600
+           px-5 py-3 font-bold text-white shadow-soft transition hover:brightness-95
+           focus:outline-none focus-visible:ring-4 focus-visible:ring-warm-300/60 active:scale-[.98];
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-200
+           bg-white/70 px-5 py-3 font-bold text-brand-700 backdrop-blur transition
+           hover:bg-brand-50;
+  }
+  .inp {
+    @apply w-full rounded-xl border border-ink-line bg-white px-4 py-3 outline-none
+           transition focus:border-brand-400 focus:ring-4 focus:ring-brand-100;
+  }
+  .card { @apply rounded-3xl border border-brand-100 bg-white shadow-card; }
+  .eyebrow { @apply text-sm font-extrabold tracking-wide text-warm-600; }
+  .h-section { @apply text-3xl font-extrabold text-brand-700 sm:text-4xl; }
+  .glass { @apply border border-white/60 bg-white/70 backdrop-blur-md; }
+  .gradient-text {
+    @apply bg-gradient-to-l from-brand-600 to-brand-400 bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .reveal { @apply opacity-0; animation: reveal .6s ease-out forwards; }
+  .reveal-2 { animation-delay: .08s; }
+  .reveal-3 { animation-delay: .16s; }
+  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+  .reveal, .reveal-2, .reveal-3 { transform: translateY(14px); }
+  .blob {
+    @apply pointer-events-none absolute -z-10 rounded-full blur-3xl;
+  }
+}
