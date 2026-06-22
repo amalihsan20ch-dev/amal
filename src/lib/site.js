@@ -7,5 +7,5 @@ export const SITE = {
   facebook: "https://www.facebook.com/share/1JiJbrC7s6/",
   city: "جبلة وريفها، سوريا",
   decree: "مُشهرة بقرار 856 — 4/4/2022",
-  url: "https://amal.vercel.app", // ← عدّله إلى نطاقك على Vercel للـ SEO
+  url: "https://amal-ihsan.vercel.app/", // ← عدّله إلى نطاقك على Vercel للـ SEO
 };
